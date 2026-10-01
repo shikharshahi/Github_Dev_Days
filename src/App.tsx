@@ -173,6 +173,7 @@ function App() {
   const [interior, setInterior] = useState<Building | null>(null)
   const [prompt, setPrompt] = useState('Click the world to capture the mouse · WASD to walk')
   const [visited, setVisited] = useState<string[]>([])
+  const [doorwayPosition, setDoorwayPosition] = useState<[number, number] | null>(null)
 
   const activeIndex = buildings.findIndex((building) => !visited.includes(building.id))
   const activeBuilding = buildings[Math.max(activeIndex, 0)]
@@ -202,7 +203,7 @@ function App() {
     sun.position.set(-15, 24, 10)
     scene.add(sun)
     const player = new THREE.Object3D()
-    player.position.set(0, eyeHeight, interior ? 3.2 : 4.7)
+    player.position.set(interior ? 0 : doorwayPosition?.[0] ?? 0, eyeHeight, interior ? 3.2 : doorwayPosition?.[1] ?? 4.7)
     scene.add(player)
     const obstacles: THREE.Box3[] = []
     const animated: { object: THREE.Object3D; start: THREE.Vector3; end: THREE.Vector3; speed: number }[] = []
@@ -247,18 +248,40 @@ function App() {
     const pointerlock = () => { locked = document.pointerLockElement === renderer.domElement; setPrompt(locked ? 'WASD move · mouse look · E enter · Escape release' : 'Click the world to capture the mouse · WASD to walk') }
     const click = () => renderer.domElement.requestPointerLock()
     const mouse = (event: MouseEvent) => { if (locked) { yaw -= event.movementX * .0022; pitch = THREE.MathUtils.clamp(pitch - event.movementY * .0022, -1.2, 1.2) } }
+    const tryMove = (movement: THREE.Vector3) => {
+      const next = player.position.clone().add(movement)
+      if (interior) {
+        next.x = THREE.MathUtils.clamp(next.x, -7, 7)
+        next.z = THREE.MathUtils.clamp(next.z, -4, 4)
+        player.position.copy(next)
+        return
+      }
+      next.x = THREE.MathUtils.clamp(next.x, -worldBounds.x, worldBounds.x)
+      next.z = THREE.MathUtils.clamp(next.z, -worldBounds.z, worldBounds.z)
+      if (!obstacles.some((box) => box.containsPoint(next))) player.position.copy(next)
+    }
     const accessibleMove = (event: Event) => {
       const directions: Record<string, [number, number]> = { forward: [0, -1], backward: [0, 1], left: [-1, 0], right: [1, 0] }
       const [x, z] = directions[(event as CustomEvent<string>).detail] ?? [0, 0]
-      player.position.x = THREE.MathUtils.clamp(player.position.x + x * .9, -worldBounds.x, worldBounds.x)
-      player.position.z = THREE.MathUtils.clamp(player.position.z + z * .9, -worldBounds.z, worldBounds.z)
+      tryMove(new THREE.Vector3(x * .9, 0, z * .9))
     }
     const keydown = (event: KeyboardEvent) => {
       if ((event.target as HTMLElement | null)?.tagName === 'BUTTON') return
       if (event.code === 'KeyE') {
         if (interior) { setInterior(null); return }
-        const near = buildings.find((building, index) => index <= activeIndex && player.position.distanceTo(building.position) < 4.2)
-        if (near) { setVisited((current) => current.includes(near.id) ? current : [...current, near.id]); setInterior(near) }
+        const forward = new THREE.Vector3(Math.sin(yaw), 0, -Math.cos(yaw))
+        const near = buildings.find((building, index) => {
+          if (index > activeIndex) return false
+          const portal = new THREE.Vector3(building.position.x, eyeHeight, building.position.z + building.size.z / 2 + .2)
+          const toPortal = portal.clone().sub(player.position).setY(0)
+          return toPortal.length() < 2.2 && forward.dot(toPortal.normalize()) > .65
+        })
+        if (near) {
+          const portalZ = near.position.z + near.size.z / 2 + .2
+          setDoorwayPosition([near.position.x, portalZ])
+          setVisited((current) => current.includes(near.id) ? current : [...current, near.id])
+          setInterior(near)
+        }
       }
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) { event.preventDefault(); keys.add(event.code) }
     }
@@ -282,15 +305,7 @@ function App() {
       const forward = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'))
       const side = Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'))
       const direction = new THREE.Vector3(side, 0, -forward).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw)
-      const next = player.position.clone().addScaledVector(direction, delta * 5)
-      if (interior) {
-        next.x = THREE.MathUtils.clamp(next.x, -7, 7)
-        next.z = THREE.MathUtils.clamp(next.z, -4, 4)
-      } else {
-        next.x = THREE.MathUtils.clamp(next.x, -worldBounds.x, worldBounds.x)
-        next.z = THREE.MathUtils.clamp(next.z, -worldBounds.z, worldBounds.z)
-        if (!obstacles.some((box) => box.containsPoint(next))) player.position.copy(next)
-      }
+      tryMove(direction.multiplyScalar(delta * 5))
       player.position.y = eyeHeight
       camera.position.copy(player.position)
       camera.rotation.order = 'YXZ'
@@ -315,7 +330,7 @@ function App() {
       renderer.dispose()
       container.removeChild(renderer.domElement)
     }
-  }, [activeBuilding, activeIndex, interior, ready, visited])
+  }, [activeBuilding, activeIndex, doorwayPosition, interior, ready, visited])
 
   if (!ready) return <main className="loading-screen"><div className="loading-mark">GH</div><p className="eyebrow">Github Village</p><h1>Preparing the world</h1><div className="loading-track" role="progressbar" aria-valuenow={loading} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${loading}%` }} /></div><strong>{loading}%</strong></main>
   const moveButton = (direction: string) => window.dispatchEvent(new CustomEvent('gitquest-move', { detail: direction }))
