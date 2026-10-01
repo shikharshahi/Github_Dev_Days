@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Commit Village</title>
+<meta name="description" content="A voxel village where Git and GitHub come to life: commit, push, pull, branch, pull requests, CI and deploys, visualised.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect x='2' y='7' width='12' height='8' fill='%23E9D7B5'/><path d='M1 8 8 2l7 6z' fill='%23B5533A'/><rect x='7' y='10' width='2' height='5' fill='%236A3D1E'/></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-mode="title">
+<div id="app"></div>
+
+<div id="loading"><div class="ld-box"><div class="ld-house"></div><p>Building the village…</p></div></div>
+
+<!-- Title -->
+<section id="title">
+  <div class="t-card">
+    <div class="t-kicker">A voxel adventure in version control</div>
+    <h1>Commit<span>Village</span></h1>
+    <p class="t-sub">Every Git command is something that happens in the village: crates are packed, sealed, carted over the bridge, inspected at the mill and shipped from the harbour.</p>
+    <div class="t-flow">
+      <span>🔨 edit</span><i>→</i><span>📦 add</span><i>→</i><span>🔒 commit</span><i>→</i><span>🚚 push</span><i>→</i><span>📜 PR</span><i>→</i><span>⚙️ CI</span><i>→</i><span>⛵ deploy</span>
+    </div>
+    <div class="t-btns">
+      <button class="big primary" data-start="story">▶ Start the Story <small>9 guided chapters · ~15 min</small></button>
+      <button class="big" data-start="sandbox">🧪 Sandbox <small>every command unlocked</small></button>
+    </div>
+    <div class="t-hint">Drag to orbit · Right-drag / WASD to pan · Scroll to zoom · Click buildings · Press <kbd>/</kbd> for the terminal</div>
+  </div>
+</section>
+
+<!-- HUD -->
+<div id="hud" class="hide">
+  <header id="topbar">
+    <div class="brand">🏘️ <b>Commit Village</b> <span class="mode-chip story">Story</span><span class="mode-chip sandbox">Sandbox</span></div>
+    <div class="tools">
+      <div class="timebox" title="Time of day"><span id="clock">16:36</span><input id="time" type="range" min="0" max="23.99" step="0.01" value="16.6"><button id="btn-auto" class="ib" title="Auto day/night cycle">⏱</button></div>
+      <button id="btn-codex" class="ib wide" title="Analogy codex">📖 Codex</button>
+      <button id="btn-labels" class="ib" title="Toggle labels">🏷️</button>
+      <button id="btn-cam" class="ib" title="Cinematic camera">🎥</button>
+      <button id="btn-sound" class="ib" title="Sound">🔊</button>
+      <button id="btn-menu" class="ib" title="Main menu">☰</button>
+    </div>
+  </header>
+
+  <aside id="mission" class="panel hide">
+    <div class="m-head"><span id="m-step">1 / 9</span><div class="m-prog"><div id="m-bar"></div></div></div>
+    <h2 id="m-title"></h2>
+    <div class="m-sec village"><div class="k">In the village</div><div id="m-story"></div></div>
+    <div class="m-sec git" id="m-git"></div>
+    <ul id="m-checks"></ul>
+    <div class="m-btns">
+      <button id="m-hint" class="ghost">💡 Hint</button>
+      <button id="m-show" class="ghost">📍 Show me</button>
+      <button id="m-next" class="primary">Continue ▶</button>
+    </div>
+  </aside>
+
+  <aside id="status" class="panel">
+    <div class="s-row head"><span>HEAD</span><span id="st-branch" class="chip br main">main</span></div>
+    <div class="s-grid">
+      <div><span class="s-k">🔨 Working</span><b id="st-work">0</b></div>
+      <div><span class="s-k">📦 Staged</span><b id="st-stage">0</b></div>
+      <div><span class="s-k">🗄️ Commits</span><b id="st-local">1</b></div>
+      <div><span class="s-k">🌉 origin</span><b id="st-sync"></b></div>
+    </div>
+    <div class="s-row"><span>📜 Pull request</span><span id="st-pr"></span></div>
+    <div class="s-row"><span>⚙️ Checks</span><span id="st-ci"></span></div>
+    <div id="pipe" title="mill · lint · test · build · deploy"></div>
+    <div class="s-cap">Ledger · <code>git log</code></div>
+    <ul id="ledger"></ul>
+  </aside>
+
+  <div id="bottom">
+    <section id="term" class="panel min">
+      <div class="term-head" id="btn-term"><span>⌨️ Terminal</span><span class="dim">type real git commands · press / to focus</span></div>
+      <div id="term-out"></div>
+      <div class="term-in-row"><span class="pr">$</span><input id="term-in" autocomplete="off" spellcheck="false" placeholder="git status"></div>
+    </section>
+    <nav id="dock"></nav>
+  </div>
+
+  <div id="labels"></div>
+  <div id="toasts"></div>
+
+  <div id="info" class="panel hide">
+    <button class="x">✕</button>
+    <div class="ttl"></div><div class="term chip"></div>
+    <p class="desc"></p>
+    <div class="acts"></div>
+  </div>
+
+  <div id="codex" class="panel hide">
+    <button class="x">✕</button>
+    <h3>📖 The Village Codex</h3>
+    <p class="dim">Every place in the village maps to a real Git / GitHub concept.</p>
+    <div class="codex-scroll"><table><thead><tr><th>In the village</th><th>In Git / GitHub</th><th>Meaning</th></tr></thead><tbody id="codex-body"></tbody></table></div>
+  </div>
+
+  <div id="commit-modal" class="modal hide">
+    <form id="commit-form" class="panel">
+      <h3>🔒 Seal the crate</h3>
+      <p class="dim">Every commit needs a label: a short message saying <i>what</i> changed and <i>why</i>.</p>
+      <div id="commit-files"></div>
+      <div class="cm-row"><code>git commit -m "</code><input id="commit-msg" maxlength="60"><code>"</code></div>
+      <div class="m-btns"><button type="button" id="commit-cancel" class="ghost">Cancel</button><button type="submit" class="primary">Seal it ▶</button></div>
+    </form>
+  </div>
+
+  <div id="finale" class="modal hide">
+    <div class="panel fin">
+      <h2>🎉 You shipped to production!</h2>
+      <p>You walked the whole Git &amp; GitHub journey, from a parchment on the workbench to a ship on the horizon.</p>
+      <div id="finale-stats"></div>
+      <pre class="cheat">edit files             # 🔨 Workshop
+git add .              # 📦 pack the crate (stage)
+git commit -m "msg"    # 🔒 seal it (local repo)
+git push               # 🚚 cart it to GitHub
+git fetch / git pull   # 🕊️ news / 📥 bring crates home
+git switch -c feature  # 🌿 build a side road
+gh pr create           # 📜 pin a petition
+  → CI runs            # ⚙️ mill · 🔍 lint · 🧪 test · 🔥 build
+gh pr merge            # 🤝 roads join → ⛵ deploy</pre>
+      <div class="m-btns"><button class="ghost" onclick="location.reload()">↺ Play again</button><button class="primary" onclick="document.getElementById('finale').classList.add('hide'); Game.start('sandbox')">🧪 Keep playing in Sandbox</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="lib/three.min.js"></script>
+<script src="js/voxel.js"></script>
+<script src="js/world.js"></script>
+<script src="js/git.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
