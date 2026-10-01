@@ -173,6 +173,17 @@ function boot() {
 
   addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
   $('#loading').classList.add('hide');
+  // demo links: ?mode=story&step=3&time=21&cam=x,z,dist,yaw,pitch&clean
+  const Q = new URLSearchParams(location.search);
+  if (Q.get('time')) { Sky.time = +Q.get('time'); Sky.auto = false; }
+  if (Q.get('mode')) Game.start(Q.get('mode'));
+  if (Q.get('step') && Game.mode === 'story') Game.goStep(+Q.get('step'));
+  if (Q.get('cam')) {
+    const [x, z, d, y, p] = Q.get('cam').split(',').map(Number);
+    Cam.T.set(x, World.groundY(x, z) + 1, z); Cam.t.copy(Cam.T);
+    Cam.D = Cam.dist = d; Cam.Y = Cam.yaw = y; Cam.P = Cam.pitch = p;
+  }
+  if (Q.has('clean')) document.body.classList.add('clean');
   const clock = new THREE.Clock(); let smokeT = 0;
   let simT = 0;
   // window.__frame(dt, false) lets tests step the simulation while the tab is hidden
