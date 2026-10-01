@@ -142,7 +142,6 @@ function addInteriorLesson(station: Station, scene: THREE.Scene) {
 
 function App() {
   const sceneRef = useRef<HTMLDivElement>(null)
-  const [activeStation, setActiveStation] = useState<Station | null>(null)
   const [visited, setVisited] = useState<string[]>([])
   const [focused, setFocused] = useState(false)
   const [nearbyCommand, setNearbyCommand] = useState<string | null>(null)
@@ -328,7 +327,6 @@ function App() {
       if (event.code === 'KeyE') {
         const nearest = stations.find((station, index) => index <= activeIndex && Math.hypot(player.position.x - station.position[0], player.position.z - station.position[1]) < 2.7)
         if (nearest) {
-          setActiveStation(nearest)
           setVisited((current) => current.includes(nearest.command) ? current : [...current, nearest.command])
         }
       }
@@ -398,7 +396,6 @@ function App() {
   const interact = () => {
     const station = stations.find((item) => item.command === nearbyCommand)
     if (!station || stations.findIndex((item) => item.command === station.command) > activeIndex) return
-    setActiveStation(station)
     setVisited((current) => current.includes(station.command) ? current : [...current, station.command])
     setInteriorStation(station)
   }
@@ -426,9 +423,7 @@ function App() {
     <main className="app-shell">
       <section className="world-card">
         <header className="hud">
-          <div className="hud-title"><div className="brand"><span className="brand-mark" aria-hidden="true">GH</span><div><p className="eyebrow">GitHub learning world</p><h1>{interiorStation ? interiorStation.title : 'Github Village'}</h1></div></div></div>
-          <div className="objective" aria-live="polite"><span>{interiorStation ? 'INSIDE HOUSE' : `OBJECTIVE ${activeIndex < 0 ? 'COMPLETE' : `${activeIndex + 1}/${stations.length}`}`}</span><strong>{interiorStation ? 'Explore the lesson room' : activeIndex < 0 ? 'Village restored!' : `Visit ${objectiveStation.title}`}</strong><small>{interiorStation ? `${interiorStation.command} · WASD to move` : activeIndex < 0 ? 'Every house explored.' : objectiveStation.command}</small></div>
-          <div className="progress" aria-label={`${visited.length} of ${stations.length} houses completed`}><strong>{visited.length}/{stations.length}</strong><span>completed</span></div>
+          <div className="objective" aria-live="polite"><span>{interiorStation ? 'INSIDE' : 'NEXT HOUSE'}</span><strong>{interiorStation ? interiorStation.title : activeIndex < 0 ? 'Village complete' : objectiveStation.title}</strong><small>{interiorStation ? `${interiorStation.command} · E / Esc to exit` : activeIndex < 0 ? 'All houses explored' : objectiveStation.command}</small></div>
         </header>
         <div ref={sceneRef} className="scene" role="img" aria-label={interiorStation ? `${interiorStation.title} interior with a procedural GitHub lesson display.` : 'GitHub Village with a central monument, winding paths, and themed learning houses.'} tabIndex={0} onFocus={() => setFocused(true)} />
         <div className="scene-controls">
@@ -442,12 +437,6 @@ function App() {
           {interiorStation ? <button type="button" className="interact-button exit-button" onClick={() => setInteriorStation(null)}>Exit to village</button> : <button type="button" className="interact-button" onClick={interact} disabled={!nearbyCommand}>{nearbyCommand ? `Enter: ${nearbyCommand}` : 'Walk near an active house'}</button>}
         </div>
       </section>
-      <aside className="lesson-card" aria-live="polite">
-        <div><p className="level-label">House lesson</p><h2>{activeStation ? activeStation.title : 'Choose a house'}</h2></div>
-        {activeStation ? <><p className="command">{activeStation.command}</p><p>{activeStation.analogy}</p><p className="lesson">{activeStation.lesson}</p></> : <p>Every house has one clear GitHub workflow idea. Explore the village to unlock its command, analogy, and explanation.</p>}
-        <div className="station-grid">{stations.map((station, index) => <span key={station.command} className={visited.includes(station.command) ? 'visited' : index === activeIndex ? 'active' : 'locked'}>{visited.includes(station.command) ? '✓ ' : index > activeIndex ? '🔒 ' : '→ '}{station.title}</span>)}</div>
-      </aside>
-      <footer>WASD / arrows move · drag looks · scroll zooms · E enters · Procedural geometry only</footer>
     </main>
   )
 }
