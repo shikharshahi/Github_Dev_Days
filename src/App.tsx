@@ -280,7 +280,6 @@ function App() {
       tryMove(new THREE.Vector3(x, 0, z).applyAxisAngle(new THREE.Vector3(0, 1, 0), yawRef.current).multiplyScalar(.9))
     }
     const keydown = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement | null)?.tagName === 'BUTTON') return
       if (event.code === 'KeyE') {
         if (interior) { setInterior(null); return }
         const forward = new THREE.Vector3(Math.sin(yawRef.current), 0, -Math.cos(yawRef.current))
@@ -297,15 +296,23 @@ function App() {
           setInterior(near)
         }
       }
-      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) { event.preventDefault(); keys.add(event.code) }
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) {
+        if ((event.target as HTMLElement | null)?.tagName === 'BUTTON') return
+        event.preventDefault()
+        keys.add(event.code)
+      }
     }
     const keyup = (event: KeyboardEvent) => keys.delete(event.code)
+    const clearKeys = () => keys.clear()
+    const visibilityChange = () => { if (document.visibilityState !== 'visible') clearKeys() }
     renderer.domElement.addEventListener('click', click)
     renderer.domElement.addEventListener('mousemove', mouse)
     document.addEventListener('pointerlockchange', pointerlock)
     window.addEventListener('keydown', keydown)
     window.addEventListener('keyup', keyup)
     window.addEventListener('gitquest-move', accessibleMove)
+    window.addEventListener('blur', clearKeys)
+    document.addEventListener('visibilitychange', visibilityChange)
     window.addEventListener('blur', releasePointerLock)
     const resize = () => { const { width, height } = container.getBoundingClientRect(); camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height) }
     const observer = new ResizeObserver(resize)
@@ -342,6 +349,8 @@ function App() {
       window.removeEventListener('keydown', keydown)
       window.removeEventListener('keyup', keyup)
       window.removeEventListener('gitquest-move', accessibleMove)
+      window.removeEventListener('blur', clearKeys)
+      document.removeEventListener('visibilitychange', visibilityChange)
       window.removeEventListener('blur', releasePointerLock)
       releasePointerLock()
       renderer.dispose()
