@@ -1,53 +1,61 @@
-# Github Village — Firebase React starter
+# [Play Github Village](https://github-village.web.app)
 
-Github Village is a browser Minecraft-inspired low-poly Three.js world that teaches clone, status, branch, switch, add, commit, push, pull, pull request, review, merge, and GitHub Actions through simple game analogies. It includes a React + TypeScript + Vite frontend with Firebase Hosting and Python Cloud Functions.
+Github Village is a full-screen, first-person low-poly village that teaches the GitHub workflow through original procedural Three.js geometry. Explore enterable houses, follow the guided route, and learn each command through in-world props, signs, animated couriers, archivists, branch paths, review boards, merge gates, and CI robots.
+
+## Controls
+
+- **Click the game canvas** to capture the mouse.
+- **Mouse movement** looks around while captured; press **Escape** to release it.
+- **WASD** or **arrow keys** move relative to the camera.
+- Press **E** at an aligned front doorway to enter a house, or inside to exit.
+- On-screen directional buttons provide an accessible movement fallback. Controls do not capture gameplay keys while a button or form control is focused.
+
+## Guided GitHub route
+
+The active route progresses in this order:
+
+**Clone → Local Repository/status → Branch/switch → Add/Stage → Commit → Push → Pull → Pull Request/Review → Merge → GitHub Actions**
+
+Each building displays an in-world state marker: active, locked, or complete. Completed buildings remain revisitable. Commit House contains a checkpoint timeline and snapshot books; Merge Manor visualizes two branches joining through review into main; Actions Workshop shows a procedural CI pipeline.
 
 ## Local development
 
-1. Install Node.js 20+ and Python 3.11+.
-2. Copy `.env.example` to `.env.local` and replace every placeholder with the Firebase Web App configuration from the Firebase console.
-3. Install dependencies and start the frontend:
+Requirements: Node.js 20+ and Python 3.11+.
 
-   ```bash
-   npm install
-   npm run dev
-   ```
+```bash
+npm install
+Copy-Item .env.example .env.local
+npm run dev
+```
 
-The callable `healthCheck` button requires Firebase Functions to be deployed or the Firebase emulators to be running. To use emulators, install Python dependencies in `functions` and run `firebase emulators:start`.
+The browser game does not require an account. The Python functions in `functions/` can be run with the Firebase emulators after installing `functions/requirements.txt`.
 
-The game itself runs entirely in the browser and does not require an account.
+## Firebase Hosting deployment
 
-## Game controls
-
-Click the world to focus it, then use **WASD** or the arrow keys to move. Drag to orbit the follow camera, scroll to zoom, and press **E** near a labeled station to open its learning panel. The on-screen directional buttons provide an accessible keyboard-free fallback. Movement shortcuts ignore focused buttons, links, and text fields.
-
-## Firebase project setup and deployment
-
-The Firebase project is `github-learning-game`, with the Github Village Hosting site at `https://github-village.web.app`. The original default site at `https://github-learning-game.web.app` is preserved. The remaining Web App values in `.env.local` must come from the Firebase console; do not commit credentials or private keys.
+The deployed site is **https://github-village.web.app**. It uses Firebase project `github-learning-game` and the `village` Hosting target. The original default Hosting site is preserved.
 
 ```bash
 firebase login
 firebase use github-learning-game
 npm run build
-firebase deploy --only hosting:village
+firebase deploy --only hosting
+```
+
+Functions deployment requires the Firebase project’s Blaze plan because Cloud Functions needs Artifact Registry and Cloud Build:
+
+```bash
 firebase deploy --only functions
 ```
 
-Deploy Firestore rules separately when needed:
+Do not commit `.env.local`, credentials, or private keys. `.env.example` contains the client configuration template.
 
-```bash
-firebase deploy --only firestore
-```
+## Project structure
 
-`firebase --version` should report an installed Firebase CLI. Deployment must be run only after replacing the placeholder project ID and confirming the Firebase CLI is logged in:
-
-```bash
-npm run build
-firebase deploy --only hosting,functions,firestore
-```
-
-Github Village Hosting is deployed. Python Functions require the Blaze (pay-as-you-go) plan because Firebase must enable Artifact Registry and Cloud Build; after upgrading the project, run `firebase deploy --only functions`.
-
-## Firebase configuration
-
-The browser SDK reads `VITE_FIREBASE_*` variables at build time. Firebase Hosting serves the generated `dist` directory, while the Python functions in `functions/main.py` expose `healthCheck` (callable) and `health` (HTTP). Keep `.env.local` out of version control; only `.env.example` belongs in the repository.
+| Path | Purpose |
+| --- | --- |
+| `src/App.tsx` | First-person Three.js world, movement, pointer lock, progression, houses, and interiors |
+| `src/App.css` | Full-screen game HUD, loading screen, and responsive controls |
+| `src/lib/firebase.ts` | Firebase Web SDK initialization |
+| `functions/main.py` | Python callable and HTTP health functions |
+| `firebase.json` / `.firebaserc` | Hosting, Functions, Firestore, emulator, project, and target configuration |
+| `public/favicon.svg` | Original Github Village SVG favicon |
