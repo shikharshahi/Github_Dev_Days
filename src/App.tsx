@@ -231,10 +231,12 @@ function App() {
       scene.add(square)
       buildings.forEach((building, index) => addHouse(scene, building, visited.includes(building.id) ? 'COMPLETE' : index === activeIndex ? 'ACTIVE' : 'LOCKED', obstacles))
       ;[[-17, -11], [-17, 11], [17, -11], [17, 11], [14, 0], [-14, 0], [8, -11], [-9, 11], [14, 8], [-14, -8]].forEach(([x, z]) => addTree(scene, x, z))
-      const route = new THREE.Mesh(new THREE.TorusGeometry(1, .08, 8, 24), new THREE.MeshStandardMaterial({ color: 0xffe28a, emissive: 0xffa31a, emissiveIntensity: .7 }))
-      route.rotation.x = Math.PI / 2
-      route.position.copy(activeBuilding.position).setY(.25)
-      scene.add(route)
+      if (activeIndex >= 0) {
+        const route = new THREE.Mesh(new THREE.TorusGeometry(.85, .08, 8, 24), new THREE.MeshStandardMaterial({ color: 0xffe28a, emissive: 0xffa31a, emissiveIntensity: .7 }))
+        route.rotation.x = Math.PI / 2
+        route.position.set(activeBuilding.position.x, .25, activeBuilding.position.z + activeBuilding.size.z / 2 + .35)
+        scene.add(route)
+      }
       const githubKeep = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2, 6, 8), new THREE.MeshStandardMaterial({ color: 0x526e9c, flatShading: true }))
       githubKeep.position.set(-.5, 3, -1)
       scene.add(githubKeep, makeLabel('REMOTE GITHUB KEEP  ·  push / pull', '#a7f3d0'))
