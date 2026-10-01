@@ -280,7 +280,9 @@ function App() {
       tryMove(new THREE.Vector3(x, 0, z).applyAxisAngle(new THREE.Vector3(0, 1, 0), yawRef.current).multiplyScalar(.9))
     }
     const keydown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
       if (event.code === 'KeyE') {
+        if (target?.closest('button, input, textarea, select, a')) return
         if (interior) { setInterior(null); return }
         const forward = new THREE.Vector3(Math.sin(yawRef.current), 0, -Math.cos(yawRef.current))
         const near = buildings.find((building, index) => {
