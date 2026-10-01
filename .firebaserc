@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "github-learning-game"
+  },
+  "targets": {
+    "github-learning-game": {
+      "hosting": {
+        "village": [
+          "github-village"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
