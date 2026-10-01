@@ -93,6 +93,53 @@ function createHouse(station: Station) {
   return house
 }
 
+function addInteriorLesson(station: Station, scene: THREE.Scene) {
+  const accent = station.palette.trim
+  const material = new THREE.MeshStandardMaterial({ color: accent, flatShading: true })
+  const dark = new THREE.MeshStandardMaterial({ color: 0x243251, flatShading: true })
+  if (station.command === 'git commit') {
+    const timeline = new THREE.Mesh(new THREE.BoxGeometry(7, 0.12, 0.18), material)
+    timeline.position.set(0, 1.4, -2)
+    scene.add(timeline)
+    ;[-2.8, -1.4, 0, 1.4, 2.8].forEach((x, index) => {
+      const checkpoint = new THREE.Mesh(new THREE.OctahedronGeometry(0.38), new THREE.MeshStandardMaterial({ color: index === 4 ? 0xffe28a : accent, emissive: accent, emissiveIntensity: 0.2 }))
+      checkpoint.position.set(x, 1.65, -2)
+      scene.add(checkpoint)
+    })
+    const sign = createLabel('COMMIT TIMELINE  ·  checkpoint → message → history', '#ffe28a')
+    sign.position.set(0, 3.1, -2)
+    scene.add(sign)
+  } else if (station.command === 'merge') {
+    const branchA = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.14, 0.35), new THREE.MeshStandardMaterial({ color: 0x38bdf8 }))
+    const branchB = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.14, 0.35), new THREE.MeshStandardMaterial({ color: 0xec4899 }))
+    branchA.position.set(-2, 1, -1)
+    branchB.position.set(-2, 1, 1)
+    branchA.rotation.y = 0.18
+    branchB.rotation.y = -0.18
+    const merged = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, 0.35), material)
+    merged.position.set(2.1, 1, 0)
+    merged.rotation.y = Math.PI / 2
+    scene.add(branchA, branchB, merged)
+    ;[-2.8, -1.5, 2.5].forEach((x, index) => {
+      const node = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), new THREE.MeshStandardMaterial({ color: index === 2 ? 0xa7f3d0 : 0xffe28a, emissive: 0x312a58, emissiveIntensity: 0.3 }))
+      node.position.set(x, 1.3, index === 1 ? 0 : index === 0 ? -1 : 0)
+      scene.add(node)
+    })
+    const sign = createLabel('PR → REVIEW → MERGE  ·  two paths, one main line', '#a7f3d0')
+    sign.position.set(0, 3.1, -2)
+    scene.add(sign)
+  } else {
+    const desk = new THREE.Mesh(new THREE.BoxGeometry(3, 0.35, 1.2), dark)
+    desk.position.set(0, 0.95, -1.4)
+    const board = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.7, 0.12), material)
+    board.position.set(0, 2.1, -2)
+    scene.add(desk, board)
+    const sign = createLabel(`${station.title}  ·  ${station.command}`, '#ffe28a')
+    sign.position.set(0, 3.25, -2)
+    scene.add(sign)
+  }
+}
+
 function App() {
   const sceneRef = useRef<HTMLDivElement>(null)
   const [activeStation, setActiveStation] = useState<Station | null>(null)
@@ -101,6 +148,7 @@ function App() {
   const [nearbyCommand, setNearbyCommand] = useState<string | null>(null)
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [ready, setReady] = useState(false)
+  const [interiorStation, setInteriorStation] = useState<Station | null>(null)
   const activeIndex = stations.findIndex((station) => !visited.includes(station.command))
   const objectiveStation = stations[Math.max(activeIndex, 0)]
 
@@ -136,6 +184,80 @@ function App() {
     sun.castShadow = true
     sun.shadow.mapSize.set(1024, 1024)
     scene.add(sun)
+
+    if (interiorStation) {
+      scene.background = new THREE.Color(0x18223e)
+      scene.fog = new THREE.Fog(0x18223e, 12, 24)
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(12, 0.25, 8), new THREE.MeshStandardMaterial({ color: 0x5f765f, flatShading: true }))
+      floor.position.y = -0.25
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(12, 5, 0.3), new THREE.MeshStandardMaterial({ color: interiorStation.palette.wall, flatShading: true }))
+      backWall.position.set(0, 2.25, -3.8)
+      const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.3, 5, 8), new THREE.MeshStandardMaterial({ color: interiorStation.palette.wall, flatShading: true }))
+      sideWall.position.set(-5.8, 2.25, 0)
+      scene.add(floor, backWall, sideWall)
+      addInteriorLesson(interiorStation, scene)
+      const player = new THREE.Mesh(new THREE.BoxGeometry(0.58, 1.15, 0.58), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x304b87, emissiveIntensity: 0.3 }))
+      player.position.set(0, 0.65, 2.5)
+      scene.add(player)
+      const keys = new Set<string>()
+      const keydown = (event: KeyboardEvent) => {
+        const target = event.target as HTMLElement | null
+        if (target && ['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT'].includes(target.tagName)) return
+        if (event.code === 'Escape' || event.code === 'KeyE') {
+          setInteriorStation(null)
+          return
+        }
+        if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) {
+          event.preventDefault()
+          keys.add(event.code)
+        }
+      }
+      const keyup = (event: KeyboardEvent) => keys.delete(event.code)
+      const accessibleMove = (event: Event) => {
+        const direction = (event as CustomEvent<string>).detail
+        const moves: Record<string, [number, number]> = { forward: [0, -1], backward: [0, 1], left: [-1, 0], right: [1, 0] }
+        const [x, z] = moves[direction] ?? [0, 0]
+        player.position.x = THREE.MathUtils.clamp(player.position.x + x * 1.1, -4.8, 4.8)
+        player.position.z = THREE.MathUtils.clamp(player.position.z + z * 1.1, -2.8, 3.2)
+      }
+      window.addEventListener('keydown', keydown)
+      window.addEventListener('keyup', keyup)
+      window.addEventListener('gitquest-move', accessibleMove)
+      const resize = () => {
+        const { width, height } = container.getBoundingClientRect()
+        camera.aspect = width / height
+        camera.updateProjectionMatrix()
+        renderer.setSize(width, height)
+      }
+      const observer = new ResizeObserver(resize)
+      observer.observe(container)
+      resize()
+      let animation = 0
+      let lastTime = performance.now()
+      const animate = (time: number) => {
+        animation = requestAnimationFrame(animate)
+        const delta = Math.min((time - lastTime) / 1000, 0.05)
+        lastTime = time
+        const forward = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'))
+        const side = Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'))
+        player.position.x = THREE.MathUtils.clamp(player.position.x + side * delta * 4, -4.8, 4.8)
+        player.position.z = THREE.MathUtils.clamp(player.position.z - forward * delta * 4, -2.8, 3.2)
+        const target = player.position.clone().add(new THREE.Vector3(0, 0.8, 0))
+        camera.position.lerp(target.clone().add(new THREE.Vector3(0, 3.7, 6.5)), 1 - Math.pow(0.001, delta))
+        camera.lookAt(target)
+        renderer.render(scene, camera)
+      }
+      animate(performance.now())
+      return () => {
+        cancelAnimationFrame(animation)
+        observer.disconnect()
+        window.removeEventListener('keydown', keydown)
+        window.removeEventListener('keyup', keyup)
+        window.removeEventListener('gitquest-move', accessibleMove)
+        renderer.dispose()
+        container.removeChild(renderer.domElement)
+      }
+    }
 
     const ground = new THREE.Mesh(new THREE.BoxGeometry(34, 0.55, 22), new THREE.MeshStandardMaterial({ color: 0x78b568, flatShading: true }))
     ground.position.y = -0.3
@@ -271,13 +393,14 @@ function App() {
       renderer.dispose()
       container.removeChild(renderer.domElement)
     }
-  }, [activeIndex, ready, visited])
+  }, [activeIndex, ready, visited, interiorStation])
 
   const interact = () => {
     const station = stations.find((item) => item.command === nearbyCommand)
     if (!station || stations.findIndex((item) => item.command === station.command) > activeIndex) return
     setActiveStation(station)
     setVisited((current) => current.includes(station.command) ? current : [...current, station.command])
+    setInteriorStation(station)
   }
   const moveWithButton = (direction: string) => {
     window.dispatchEvent(new CustomEvent('gitquest-move', { detail: direction }))
@@ -303,20 +426,20 @@ function App() {
     <main className="app-shell">
       <section className="world-card">
         <header className="hud">
-          <div className="hud-title"><div className="brand"><span className="brand-mark" aria-hidden="true">GH</span><div><p className="eyebrow">GitHub learning world</p><h1>Github Village</h1></div></div></div>
-          <div className="objective" aria-live="polite"><span>OBJECTIVE {activeIndex < 0 ? 'COMPLETE' : `${activeIndex + 1}/${stations.length}`}</span><strong>{activeIndex < 0 ? 'Village restored!' : `Visit ${objectiveStation.title}`}</strong><small>{activeIndex < 0 ? 'Every house explored.' : objectiveStation.command}</small></div>
+          <div className="hud-title"><div className="brand"><span className="brand-mark" aria-hidden="true">GH</span><div><p className="eyebrow">GitHub learning world</p><h1>{interiorStation ? interiorStation.title : 'Github Village'}</h1></div></div></div>
+          <div className="objective" aria-live="polite"><span>{interiorStation ? 'INSIDE HOUSE' : `OBJECTIVE ${activeIndex < 0 ? 'COMPLETE' : `${activeIndex + 1}/${stations.length}`}`}</span><strong>{interiorStation ? 'Explore the lesson room' : activeIndex < 0 ? 'Village restored!' : `Visit ${objectiveStation.title}`}</strong><small>{interiorStation ? `${interiorStation.command} · WASD to move` : activeIndex < 0 ? 'Every house explored.' : objectiveStation.command}</small></div>
           <div className="progress" aria-label={`${visited.length} of ${stations.length} houses completed`}><strong>{visited.length}/{stations.length}</strong><span>completed</span></div>
         </header>
-        <div ref={sceneRef} className="scene" role="img" aria-label="GitHub Village with a central monument, winding paths, and themed learning houses." tabIndex={0} onFocus={() => setFocused(true)} />
+        <div ref={sceneRef} className="scene" role="img" aria-label={interiorStation ? `${interiorStation.title} interior with a procedural GitHub lesson display.` : 'GitHub Village with a central monument, winding paths, and themed learning houses.'} tabIndex={0} onFocus={() => setFocused(true)} />
         <div className="scene-controls">
-          <p>{focused ? 'Active houses glow gold. Walk to one and press E.' : 'Click the village to focus keyboard movement.'}</p>
+          <p>{interiorStation ? `Inside ${interiorStation.title}: explore the lesson props. Press E or Escape to leave.` : focused ? 'Active houses glow gold. Walk to one and press E.' : 'Click the village to focus keyboard movement.'}</p>
           <div className="d-pad" aria-label="Accessible movement controls">
             <button type="button" onClick={() => moveWithButton('forward')} aria-label="Move forward">▲</button>
             <button type="button" onClick={() => moveWithButton('left')} aria-label="Move left">◀</button>
             <button type="button" onClick={() => moveWithButton('backward')} aria-label="Move backward">▼</button>
             <button type="button" onClick={() => moveWithButton('right')} aria-label="Move right">▶</button>
           </div>
-          <button type="button" className="interact-button" onClick={interact} disabled={!nearbyCommand}>{nearbyCommand ? `Enter: ${nearbyCommand}` : 'Walk near an active house'}</button>
+          {interiorStation ? <button type="button" className="interact-button exit-button" onClick={() => setInteriorStation(null)}>Exit to village</button> : <button type="button" className="interact-button" onClick={interact} disabled={!nearbyCommand}>{nearbyCommand ? `Enter: ${nearbyCommand}` : 'Walk near an active house'}</button>}
         </div>
       </section>
       <aside className="lesson-card" aria-live="polite">
