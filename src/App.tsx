@@ -174,6 +174,8 @@ function App() {
   const [prompt, setPrompt] = useState('Click the world to capture the mouse · WASD to walk')
   const [visited, setVisited] = useState<string[]>([])
   const [doorwayPosition, setDoorwayPosition] = useState<[number, number] | null>(null)
+  const yawRef = useRef(0)
+  const pitchRef = useRef(0)
 
   const activeIndex = buildings.findIndex((building) => !visited.includes(building.id))
   const activeBuilding = buildings[Math.max(activeIndex, 0)]
@@ -243,13 +245,23 @@ function App() {
       scene.children.at(-1)!.position.set(-.5, 8.5, -1)
     }
 
-    let yaw = 0
-    let pitch = 0
     let locked = false
     const keys = new Set<string>()
-    const pointerlock = () => { locked = document.pointerLockElement === renderer.domElement; setPrompt(locked ? 'WASD move · mouse look · E enter · Escape release' : 'Click the world to capture the mouse · WASD to walk') }
-    const click = () => renderer.domElement.requestPointerLock()
-    const mouse = (event: MouseEvent) => { if (locked) { yaw -= event.movementX * .0022; pitch = THREE.MathUtils.clamp(pitch - event.movementY * .0022, -1.2, 1.2) } }
+    const pointerlock = () => {
+      locked = document.pointerLockElement === renderer.domElement
+      setPrompt(locked ? 'WASD move · mouse look · E enter · Escape release' : 'Click the world to capture the mouse · WASD to walk')
+    }
+    const click = () => {
+      if (!locked && typeof renderer.domElement.requestPointerLock === 'function') renderer.domElement.requestPointerLock()
+    }
+    const releasePointerLock = () => {
+      if (document.pointerLockElement === renderer.domElement && typeof document.exitPointerLock === 'function') document.exitPointerLock()
+    }
+    const mouse = (event: MouseEvent) => {
+      if (!locked || document.pointerLockElement !== renderer.domElement) return
+      yawRef.current -= event.movementX * .002
+      pitchRef.current = THREE.MathUtils.clamp(pitchRef.current - event.movementY * .002, -1.15, 1.15)
+    }
     const tryMove = (movement: THREE.Vector3) => {
       const next = player.position.clone().add(movement)
       if (interior) {
@@ -265,13 +277,13 @@ function App() {
     const accessibleMove = (event: Event) => {
       const directions: Record<string, [number, number]> = { forward: [0, -1], backward: [0, 1], left: [-1, 0], right: [1, 0] }
       const [x, z] = directions[(event as CustomEvent<string>).detail] ?? [0, 0]
-      tryMove(new THREE.Vector3(x * .9, 0, z * .9))
+      tryMove(new THREE.Vector3(x, 0, z).applyAxisAngle(new THREE.Vector3(0, 1, 0), yawRef.current).multiplyScalar(.9))
     }
     const keydown = (event: KeyboardEvent) => {
       if ((event.target as HTMLElement | null)?.tagName === 'BUTTON') return
       if (event.code === 'KeyE') {
         if (interior) { setInterior(null); return }
-        const forward = new THREE.Vector3(Math.sin(yaw), 0, -Math.cos(yaw))
+        const forward = new THREE.Vector3(Math.sin(yawRef.current), 0, -Math.cos(yawRef.current))
         const near = buildings.find((building, index) => {
           if (index > activeIndex) return false
           const portal = new THREE.Vector3(building.position.x, eyeHeight, building.position.z + building.size.z / 2 + .2)
@@ -294,6 +306,7 @@ function App() {
     window.addEventListener('keydown', keydown)
     window.addEventListener('keyup', keyup)
     window.addEventListener('gitquest-move', accessibleMove)
+    window.addEventListener('blur', releasePointerLock)
     const resize = () => { const { width, height } = container.getBoundingClientRect(); camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height) }
     const observer = new ResizeObserver(resize)
     observer.observe(container)
@@ -306,13 +319,13 @@ function App() {
       last = time
       const forward = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'))
       const side = Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'))
-      const direction = new THREE.Vector3(side, 0, -forward).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw)
+      const direction = new THREE.Vector3(side, 0, -forward).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), yawRef.current)
       tryMove(direction.multiplyScalar(delta * 5))
       player.position.y = eyeHeight
       camera.position.copy(player.position)
       camera.rotation.order = 'YXZ'
-      camera.rotation.y = yaw
-      camera.rotation.x = pitch
+      camera.rotation.y = yawRef.current
+      camera.rotation.x = pitchRef.current
       animated.forEach((item, index) => {
         const phase = (time * item.speed / 1000 + index * .17) % 1
         item.object.position.lerpVectors(item.start, item.end, phase < .5 ? phase * 2 : (1 - phase) * 2)
@@ -329,6 +342,8 @@ function App() {
       window.removeEventListener('keydown', keydown)
       window.removeEventListener('keyup', keyup)
       window.removeEventListener('gitquest-move', accessibleMove)
+      window.removeEventListener('blur', releasePointerLock)
+      releasePointerLock()
       renderer.dispose()
       container.removeChild(renderer.domElement)
     }
