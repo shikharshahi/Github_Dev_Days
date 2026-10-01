@@ -7,6 +7,8 @@
 
 .app-shell { width: 100vw; height: 100vh; overflow: hidden; background: #0d1730; color: #eef5ff; }
 .world-card { position: relative; width: 100%; height: 100vh; }
+.minimal-hud { position: absolute; z-index: 2; top: 1rem; left: 1rem; max-width: min(28rem, calc(100vw - 2rem)); display: grid; gap: .25rem; padding: .65rem .85rem; border: 1px solid rgba(255, 226, 138, .65); border-radius: .6rem; background: rgba(14, 25, 50, .82); backdrop-filter: blur(7px); }
+.minimal-hud strong { color: #ffe28a; font-size: .9rem; }.minimal-hud small { color: #d5e1f6; line-height: 1.35; }
 .hud { position: absolute; z-index: 2; top: 1rem; left: 1rem; display: grid; pointer-events: none; }
 .eyebrow, .level-label { margin: 0 0 .35rem; color: #a7f3d0; font-size: .68rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
 .objective { display: grid; gap: .18rem; min-width: 12rem; padding: .55rem .75rem; border: 1px solid rgba(255, 226, 138, .65); border-radius: .65rem; background: rgba(31, 43, 69, .9); box-shadow: 0 0 1.5rem rgba(255, 226, 138, .12); }

@@ -2,166 +2,94 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import './App.css'
 
-type Station = {
-  command: string
-  title: string
-  analogy: string
-  lesson: string
-  palette: { wall: number; roof: number; trim: number }
-  position: [number, number]
-  rotation: number
-}
+type Building = { id: string; title: string; command: string; lesson: string; position: THREE.Vector3; color: number; size: THREE.Vector3 }
 
-const stations: Station[] = [
-  { command: 'git clone', title: 'Clone Cabin', analogy: 'Pack a copy of the shared village into your local backpack.', lesson: 'Clone downloads a repository so you can work on it locally.', palette: { wall: 0xe8c28f, roof: 0x315b78, trim: 0xf7e2b5 }, position: [-9, -6], rotation: 0.1 },
-  { command: 'git status', title: 'Status Cottage', analogy: 'Check your backpack before setting out.', lesson: 'Status shows changed, staged, and untracked files.', palette: { wall: 0xa7c9b1, roof: 0x356859, trim: 0xe9f3df }, position: [-3, -7], rotation: -0.15 },
-  { command: 'git branch', title: 'Branch Barn', analogy: 'Grow a safe side path for your experiment.', lesson: 'A branch is an independent line of work.', palette: { wall: 0xd9985f, roof: 0x7b3f35, trim: 0xffdfb8 }, position: [4, -7], rotation: 0.12 },
-  { command: 'git switch', title: 'Switch Bridge', analogy: 'Cross from one path to another.', lesson: 'Switch changes the branch you are currently working on.', palette: { wall: 0x9db8d0, roof: 0x3f4e7a, trim: 0xe4f0ff }, position: [10, -5], rotation: -0.1 },
-  { command: 'git add', title: 'Staging Forge', analogy: 'Choose which materials belong in your next bundle.', lesson: 'Add moves selected changes into the staging area.', palette: { wall: 0xd9b3d1, roof: 0x703f78, trim: 0xffe3f6 }, position: [11, 2], rotation: 1.5 },
-  { command: 'git commit', title: 'Commit Cottage', analogy: 'Carve a named checkpoint into the timeline.', lesson: 'A commit records a snapshot with a message.', palette: { wall: 0xd9c77d, roof: 0x7c5b31, trim: 0xfff0b2 }, position: [7, 7], rotation: 0.2 },
-  { command: 'git push / pull', title: 'Remote Dock', analogy: 'Send your work up, and bring shared discoveries back down.', lesson: 'Push uploads commits; pull fetches and integrates remote changes.', palette: { wall: 0x8ebcc2, roof: 0x2d5d62, trim: 0xdff9f4 }, position: [-1, 7], rotation: -0.1 },
-  { command: 'pull request', title: 'Pull Request Hall', analogy: 'Ask the village to inspect your path before it joins main.', lesson: 'A pull request proposes branch changes for discussion and review.', palette: { wall: 0xc7a4d4, roof: 0x5c3c78, trim: 0xf3ddff }, position: [-9, 6], rotation: 0.1 },
-  { command: 'review', title: 'Review Lookout', analogy: 'Leave helpful notes from a high view of the work.', lesson: 'Reviews improve code quality before a pull request is merged.', palette: { wall: 0xbed39b, roof: 0x42633f, trim: 0xf1f9d8 }, position: [-13, 1], rotation: -1.4 },
-  { command: 'merge', title: 'Merge Manor', analogy: 'Open the gate and join an approved path with main.', lesson: 'Merge combines completed branch history into another branch.', palette: { wall: 0xd7a18d, roof: 0x743d40, trim: 0xffdfd1 }, position: [-7, -1], rotation: 0.2 },
-  { command: 'GitHub Actions', title: 'Actions Workshop', analogy: 'Let tiny robot builders test every change automatically.', lesson: 'GitHub Actions runs repeatable CI/CD workflows from events.', palette: { wall: 0x9fb5e4, roof: 0x354b8d, trim: 0xe7edff }, position: [0, 1], rotation: -0.15 },
+const buildings: Building[] = [
+  { id: 'repo', title: 'Local Repository Workshop', command: 'git clone · git status · git add', lesson: 'Shelves hold the files in your local repository. Status inspects them; add selects what belongs in the next snapshot.', position: new THREE.Vector3(-12, 0, -7), color: 0x4d80a8, size: new THREE.Vector3(6, 4, 5) },
+  { id: 'commit', title: 'Commit House', command: 'git commit', lesson: 'The archivist places glowing snapshot books on a timeline. A commit is a named checkpoint in project history.', position: new THREE.Vector3(-4, 0, -9), color: 0xb98243, size: new THREE.Vector3(5, 4, 4) },
+  { id: 'branch', title: 'Branch Barn', command: 'git branch · git switch', lesson: 'Colored paths fork from main. A branch lets an experiment travel safely beside the shared path.', position: new THREE.Vector3(5, 0, -9), color: 0xb46d43, size: new THREE.Vector3(5, 4, 4) },
+  { id: 'review', title: 'Pull Request Hall', command: 'pull request · review', lesson: 'Reviewers inspect a proposed branch here before the gate can open.', position: new THREE.Vector3(12, 0, -5), color: 0x895ba5, size: new THREE.Vector3(6, 4, 5) },
+  { id: 'merge', title: 'Merge Gate', command: 'git merge', lesson: 'Two colored branch paths meet at this gate. Merge joins approved work into main.', position: new THREE.Vector3(11, 0, 5), color: 0x95603e, size: new THREE.Vector3(5, 4, 4) },
+  { id: 'actions', title: 'GitHub Actions Workshop', command: 'GitHub Actions · CI', lesson: 'Tiny robots move work along a pipeline and run repeatable checks after every change.', position: new THREE.Vector3(3, 0, 9), color: 0x4d72ae, size: new THREE.Vector3(6, 4, 5) },
+  { id: 'remote', title: 'Remote GitHub Keep', command: 'git push · git pull', lesson: 'Couriers carry commits between your local world and the remote GitHub keep.', position: new THREE.Vector3(-8, 0, 8), color: 0x4c8d83, size: new THREE.Vector3(5, 5, 5) },
 ]
 
-const villageBounds = { x: 15.5, z: 10 }
+const eyeHeight = 1.7
 
-function createLabel(text: string, accent: string) {
+function label(text: string, color = '#ffe28a') {
   const canvas = document.createElement('canvas')
-  canvas.width = 620
-  canvas.height = 112
-  const context = canvas.getContext('2d')
-  if (!context) return new THREE.Sprite()
-  context.fillStyle = 'rgba(22, 32, 51, .92)'
-  context.roundRect(4, 4, 612, 104, 18)
-  context.fill()
-  context.strokeStyle = accent
-  context.lineWidth = 5
-  context.stroke()
-  context.fillStyle = '#ffffff'
-  context.font = '700 28px system-ui'
-  context.textAlign = 'center'
-  context.fillText(text, 310, 69)
+  canvas.width = 760
+  canvas.height = 100
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return new THREE.Sprite()
+  ctx.fillStyle = 'rgba(12,22,43,.9)'
+  ctx.roundRect(4, 4, 752, 92, 18)
+  ctx.fill()
+  ctx.strokeStyle = color
+  ctx.lineWidth = 4
+  ctx.stroke()
+  ctx.fillStyle = '#fff'
+  ctx.font = '700 25px system-ui'
+  ctx.textAlign = 'center'
+  ctx.fillText(text, 380, 63)
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }))
-  sprite.scale.set(3.5, 0.63, 1)
+  sprite.scale.set(4.7, .62, 1)
   return sprite
 }
 
-function addTree(scene: THREE.Scene, x: number, z: number, scale = 1) {
+function makeHouse(building: Building, scene: THREE.Scene) {
   const group = new THREE.Group()
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * scale, 0.24 * scale, 1.15 * scale, 7), new THREE.MeshStandardMaterial({ color: 0x765038, flatShading: true }))
-  trunk.position.y = 0.58 * scale
-  const crown = new THREE.Mesh(new THREE.DodecahedronGeometry(0.8 * scale, 0), new THREE.MeshStandardMaterial({ color: 0x3a8a62, flatShading: true }))
-  crown.position.y = 1.55 * scale
-  group.add(trunk, crown)
-  group.position.set(x, 0, z)
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(building.size.x, building.size.y, building.size.z), new THREE.MeshStandardMaterial({ color: building.color, flatShading: true }))
+  wall.position.y = building.size.y / 2
+  wall.castShadow = true
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(building.size.x, building.size.z) * .7, 2.2, 4), new THREE.MeshStandardMaterial({ color: 0x34405f, flatShading: true }))
+  roof.position.y = building.size.y + 1
+  roof.rotation.y = Math.PI / 4
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1, 1.8, .15), new THREE.MeshStandardMaterial({ color: 0x392d2a }))
+  door.position.set(0, .9, building.size.z / 2 + .08)
+  const windowMat = new THREE.MeshStandardMaterial({ color: 0x9de7ef, emissive: 0x194c55, emissiveIntensity: .6 })
+  for (const x of [-building.size.x * .28, building.size.x * .28]) {
+    const window = new THREE.Mesh(new THREE.BoxGeometry(1, .8, .12), windowMat)
+    window.position.set(x, 2.1, building.size.z / 2 + .07)
+    group.add(window)
+  }
+  const sign = label(`${building.title}  ·  ${building.command}`)
+  sign.position.y = building.size.y + 2.3
+  group.add(wall, roof, door, sign)
+  group.position.copy(building.position)
   scene.add(group)
 }
 
-function createHouse(station: Station) {
-  const house = new THREE.Group()
-  const wallMaterial = new THREE.MeshStandardMaterial({ color: station.palette.wall, flatShading: true })
-  const trimMaterial = new THREE.MeshStandardMaterial({ color: station.palette.trim, flatShading: true })
-  const roofMaterial = new THREE.MeshStandardMaterial({ color: station.palette.roof, flatShading: true })
-  const walls = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.65, 2.4), wallMaterial)
-  walls.position.y = 0.85
-  walls.castShadow = true
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.15, 1.35, 4), roofMaterial)
-  roof.position.y = 2.35
-  roof.rotation.y = Math.PI / 4
-  roof.castShadow = true
-  const door = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.9, 0.1), new THREE.MeshStandardMaterial({ color: 0x493426 }))
-  door.position.set(0, 0.45, 1.24)
-  const doorKnob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), new THREE.MeshStandardMaterial({ color: 0xffd166, metalness: 0.6 }))
-  doorKnob.position.set(0.13, 0.48, 1.32)
-  const windowMaterial = new THREE.MeshStandardMaterial({ color: 0x84d9ed, emissive: 0x17384b, emissiveIntensity: 0.35 })
-  const windowLeft = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.48, 0.08), windowMaterial)
-  const windowRight = windowLeft.clone()
-  windowLeft.position.set(-0.87, 1.05, 1.23)
-  windowRight.position.set(0.87, 1.05, 1.23)
-  const awning = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 0.45), trimMaterial)
-  awning.position.set(0, 1.7, 1.22)
-  const lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.14), new THREE.MeshStandardMaterial({ color: 0xffdc73, emissive: 0xffa31a, emissiveIntensity: 0.8 }))
-  lamp.position.set(0.74, 1.46, 1.3)
-  const label = createLabel(`${station.title}  ·  ${station.command}`, `#${station.palette.trim.toString(16).padStart(6, '0')}`)
-  label.position.y = 3.5
-  house.add(walls, roof, door, doorKnob, windowLeft, windowRight, awning, lamp, label)
-  house.position.set(station.position[0], 0, station.position[1])
-  house.rotation.y = station.rotation
-  return house
+function addTree(scene: THREE.Scene, x: number, z: number, scale = 1) {
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.18 * scale, .3 * scale, 1.5 * scale, 7), new THREE.MeshStandardMaterial({ color: 0x70452d }))
+  trunk.position.set(x, .75 * scale, z)
+  const crown = new THREE.Mesh(new THREE.DodecahedronGeometry(1.15 * scale), new THREE.MeshStandardMaterial({ color: 0x327353, flatShading: true }))
+  crown.position.set(x, 2 * scale, z)
+  scene.add(trunk, crown)
 }
 
-function addInteriorLesson(station: Station, scene: THREE.Scene) {
-  const accent = station.palette.trim
-  const material = new THREE.MeshStandardMaterial({ color: accent, flatShading: true })
-  const dark = new THREE.MeshStandardMaterial({ color: 0x243251, flatShading: true })
-  if (station.command === 'git commit') {
-    const timeline = new THREE.Mesh(new THREE.BoxGeometry(7, 0.12, 0.18), material)
-    timeline.position.set(0, 1.4, -2)
-    scene.add(timeline)
-    ;[-2.8, -1.4, 0, 1.4, 2.8].forEach((x, index) => {
-      const checkpoint = new THREE.Mesh(new THREE.OctahedronGeometry(0.38), new THREE.MeshStandardMaterial({ color: index === 4 ? 0xffe28a : accent, emissive: accent, emissiveIntensity: 0.2 }))
-      checkpoint.position.set(x, 1.65, -2)
-      scene.add(checkpoint)
-    })
-    const sign = createLabel('COMMIT TIMELINE  ·  checkpoint → message → history', '#ffe28a')
-    sign.position.set(0, 3.1, -2)
-    scene.add(sign)
-  } else if (station.command === 'merge') {
-    const branchA = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.14, 0.35), new THREE.MeshStandardMaterial({ color: 0x38bdf8 }))
-    const branchB = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.14, 0.35), new THREE.MeshStandardMaterial({ color: 0xec4899 }))
-    branchA.position.set(-2, 1, -1)
-    branchB.position.set(-2, 1, 1)
-    branchA.rotation.y = 0.18
-    branchB.rotation.y = -0.18
-    const merged = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, 0.35), material)
-    merged.position.set(2.1, 1, 0)
-    merged.rotation.y = Math.PI / 2
-    scene.add(branchA, branchB, merged)
-    ;[-2.8, -1.5, 2.5].forEach((x, index) => {
-      const node = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), new THREE.MeshStandardMaterial({ color: index === 2 ? 0xa7f3d0 : 0xffe28a, emissive: 0x312a58, emissiveIntensity: 0.3 }))
-      node.position.set(x, 1.3, index === 1 ? 0 : index === 0 ? -1 : 0)
-      scene.add(node)
-    })
-    const sign = createLabel('PR → REVIEW → MERGE  ·  two paths, one main line', '#a7f3d0')
-    sign.position.set(0, 3.1, -2)
-    scene.add(sign)
-  } else {
-    const desk = new THREE.Mesh(new THREE.BoxGeometry(3, 0.35, 1.2), dark)
-    desk.position.set(0, 0.95, -1.4)
-    const board = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.7, 0.12), material)
-    board.position.set(0, 2.1, -2)
-    scene.add(desk, board)
-    const sign = createLabel(`${station.title}  ·  ${station.command}`, '#ffe28a')
-    sign.position.set(0, 3.25, -2)
-    scene.add(sign)
-  }
+function addBook(scene: THREE.Scene, position: THREE.Vector3, color: number) {
+  const book = new THREE.Mesh(new THREE.BoxGeometry(.35, .12, .5), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: .5 }))
+  book.position.copy(position)
+  scene.add(book)
+  return book
 }
 
 function App() {
   const sceneRef = useRef<HTMLDivElement>(null)
-  const [visited, setVisited] = useState<string[]>([])
-  const [focused, setFocused] = useState(false)
-  const [nearbyCommand, setNearbyCommand] = useState<string | null>(null)
-  const [loadingProgress, setLoadingProgress] = useState(0)
+  const [loading, setLoading] = useState(0)
   const [ready, setReady] = useState(false)
-  const [interiorStation, setInteriorStation] = useState<Station | null>(null)
-  const activeIndex = stations.findIndex((station) => !visited.includes(station.command))
-  const objectiveStation = stations[Math.max(activeIndex, 0)]
+  const [interior, setInterior] = useState<Building | null>(null)
+  const [prompt, setPrompt] = useState('Click the world to capture the mouse · WASD to walk')
+  const [objective, setObjective] = useState('Find the Local Repository Workshop')
+  const [visited, setVisited] = useState<string[]>([])
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setLoadingProgress((current) => {
-        const next = Math.min(current + 20, 100)
-        if (next === 100) {
-          window.clearInterval(timer)
-          window.setTimeout(() => setReady(true), 180)
-        }
-        return next
-      })
-    }, 120)
+    const timer = window.setInterval(() => setLoading((value) => {
+      const next = Math.min(100, value + 20)
+      if (next === 100) { window.clearInterval(timer); window.setTimeout(() => setReady(true), 150) }
+      return next
+    }), 100)
     return () => window.clearInterval(timer)
   }, [])
 
@@ -169,276 +97,149 @@ function App() {
     const container = sceneRef.current
     if (!container || !ready) return
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x9bdcf1)
-    scene.fog = new THREE.Fog(0x9bdcf1, 22, 45)
-    const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 100)
+    scene.background = new THREE.Color(interior ? 0x19233d : 0x8fd5ec)
+    scene.fog = new THREE.Fog(scene.background, interior ? 12 : 28, interior ? 28 : 55)
+    const camera = new THREE.PerspectiveCamera(70, 1, .08, 100)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6))
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))
     renderer.shadowMap.enabled = true
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap
     container.appendChild(renderer.domElement)
-    scene.add(new THREE.HemisphereLight(0xe8f8ff, 0x45644a, 2.4))
-    const sun = new THREE.DirectionalLight(0xfff0c2, 3)
-    sun.position.set(-10, 18, 8)
+    scene.add(new THREE.HemisphereLight(0xdff8ff, 0x314d3f, 2.2))
+    const sun = new THREE.DirectionalLight(0xffedc1, 2.8)
+    sun.position.set(-15, 24, 10)
     sun.castShadow = true
-    sun.shadow.mapSize.set(1024, 1024)
     scene.add(sun)
 
-    if (interiorStation) {
-      scene.background = new THREE.Color(0x18223e)
-      scene.fog = new THREE.Fog(0x18223e, 12, 24)
-      const floor = new THREE.Mesh(new THREE.BoxGeometry(12, 0.25, 8), new THREE.MeshStandardMaterial({ color: 0x5f765f, flatShading: true }))
-      floor.position.y = -0.25
-      const backWall = new THREE.Mesh(new THREE.BoxGeometry(12, 5, 0.3), new THREE.MeshStandardMaterial({ color: interiorStation.palette.wall, flatShading: true }))
-      backWall.position.set(0, 2.25, -3.8)
-      const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.3, 5, 8), new THREE.MeshStandardMaterial({ color: interiorStation.palette.wall, flatShading: true }))
-      sideWall.position.set(-5.8, 2.25, 0)
-      scene.add(floor, backWall, sideWall)
-      addInteriorLesson(interiorStation, scene)
-      const player = new THREE.Mesh(new THREE.BoxGeometry(0.58, 1.15, 0.58), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x304b87, emissiveIntensity: 0.3 }))
-      player.position.set(0, 0.65, 2.5)
-      scene.add(player)
-      const keys = new Set<string>()
-      const keydown = (event: KeyboardEvent) => {
-        const target = event.target as HTMLElement | null
-        if (target && ['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT'].includes(target.tagName)) return
-        if (event.code === 'Escape' || event.code === 'KeyE') {
-          setInteriorStation(null)
-          return
-        }
-        if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) {
-          event.preventDefault()
-          keys.add(event.code)
-        }
-      }
-      const keyup = (event: KeyboardEvent) => keys.delete(event.code)
-      const accessibleMove = (event: Event) => {
-        const direction = (event as CustomEvent<string>).detail
-        const moves: Record<string, [number, number]> = { forward: [0, -1], backward: [0, 1], left: [-1, 0], right: [1, 0] }
-        const [x, z] = moves[direction] ?? [0, 0]
-        player.position.x = THREE.MathUtils.clamp(player.position.x + x * 1.1, -4.8, 4.8)
-        player.position.z = THREE.MathUtils.clamp(player.position.z + z * 1.1, -2.8, 3.2)
-      }
-      window.addEventListener('keydown', keydown)
-      window.addEventListener('keyup', keyup)
-      window.addEventListener('gitquest-move', accessibleMove)
-      const resize = () => {
-        const { width, height } = container.getBoundingClientRect()
-        camera.aspect = width / height
-        camera.updateProjectionMatrix()
-        renderer.setSize(width, height)
-      }
-      const observer = new ResizeObserver(resize)
-      observer.observe(container)
-      resize()
-      let animation = 0
-      let lastTime = performance.now()
-      const animate = (time: number) => {
-        animation = requestAnimationFrame(animate)
-        const delta = Math.min((time - lastTime) / 1000, 0.05)
-        lastTime = time
-        const forward = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'))
-        const side = Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'))
-        player.position.x = THREE.MathUtils.clamp(player.position.x + side * delta * 4, -4.8, 4.8)
-        player.position.z = THREE.MathUtils.clamp(player.position.z - forward * delta * 4, -2.8, 3.2)
-        const target = player.position.clone().add(new THREE.Vector3(0, 0.8, 0))
-        camera.position.lerp(target.clone().add(new THREE.Vector3(0, 3.7, 6.5)), 1 - Math.pow(0.001, delta))
-        camera.lookAt(target)
-        renderer.render(scene, camera)
-      }
-      animate(performance.now())
-      return () => {
-        cancelAnimationFrame(animation)
-        observer.disconnect()
-        window.removeEventListener('keydown', keydown)
-        window.removeEventListener('keyup', keyup)
-        window.removeEventListener('gitquest-move', accessibleMove)
-        renderer.dispose()
-        container.removeChild(renderer.domElement)
-      }
-    }
-
-    const ground = new THREE.Mesh(new THREE.BoxGeometry(34, 0.55, 22), new THREE.MeshStandardMaterial({ color: 0x78b568, flatShading: true }))
-    ground.position.y = -0.3
-    ground.receiveShadow = true
-    scene.add(ground)
-    const square = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.5, 0.08, 8), new THREE.MeshStandardMaterial({ color: 0xdabf87, flatShading: true }))
-    square.position.y = 0.03
-    scene.add(square)
-    const paths = [
-      new THREE.Mesh(new THREE.BoxGeometry(30, 0.05, 1.8), new THREE.MeshStandardMaterial({ color: 0xdabf87 })),
-      new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 18), new THREE.MeshStandardMaterial({ color: 0xdabf87 })),
-    ]
-    paths[0].position.y = 0.04
-    paths[1].position.y = 0.045
-    scene.add(...paths)
-
-    const monument = new THREE.Group()
-    const monumentBase = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.5, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0x64748b, flatShading: true }))
-    const octocat = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 1), new THREE.MeshStandardMaterial({ color: 0xf5f7fb, emissive: 0x304b87, emissiveIntensity: 0.2, flatShading: true }))
-    octocat.position.y = 1.1
-    monument.add(monumentBase, octocat)
-    const monumentLabel = createLabel('GITHUB VILLAGE  ·  start here', '#a7f3d0')
-    monumentLabel.position.y = 2.75
-    monument.add(monumentLabel)
-    monument.position.y = 0.2
-    scene.add(monument)
-
-    const garden = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 0.04, 12), new THREE.MeshStandardMaterial({ color: 0x5d9c59 }))
-    garden.position.set(0, 0.08, 0)
-    scene.add(garden)
-    stations.forEach((station, index) => {
-      const house = createHouse(station)
-      const state = visited.includes(station.command) ? 'DONE' : index === activeIndex ? 'ACTIVE' : 'LOCKED'
-      const stateColor = state === 'DONE' ? '#a7f3d0' : state === 'ACTIVE' ? '#ffe28a' : '#a8b3c7'
-      const stateLabel = createLabel(`${state}  ·  ${station.title}`, stateColor)
-      stateLabel.position.set(station.position[0], 4.15, station.position[1])
-      scene.add(house, stateLabel)
-    })
-    ;[[-15, -9], [-15, 9], [15, -9], [15, 9], [14, 0], [-14, 0], [5, -9], [-3, 9], [12, 8], [-12, -8]].forEach(([x, z]) => addTree(scene, x, z, 0.9))
-
-    const player = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.2, 0.6), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x304b87, emissiveIntensity: 0.3 }))
-    player.position.set(0, 0.7, 4.5)
-    player.castShadow = true
+    const player = new THREE.Object3D()
+    player.position.set(0, eyeHeight, interior ? 4 : 5)
     scene.add(player)
-    const marker = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.3, 8), new THREE.MeshBasicMaterial({ color: 0xfff09b }))
-    marker.position.y = 1.8
-    player.add(marker)
+    const obstacles: THREE.Box3[] = []
+    const animated: { object: THREE.Object3D; start: THREE.Vector3; end: THREE.Vector3; speed: number }[] = []
 
-    const keys = new Set<string>()
-    let yaw = 0
-    let cameraDistance = 9
-    let dragging = false
-    let lastPointerX = 0
-    const movePlayer = (direction: string) => {
-      const moves: Record<string, [number, number]> = { forward: [0, -1], backward: [0, 1], left: [-1, 0], right: [1, 0] }
-      const [x, z] = moves[direction] ?? [0, 0]
-      player.position.x = THREE.MathUtils.clamp(player.position.x + x * 1.2, -villageBounds.x, villageBounds.x)
-      player.position.z = THREE.MathUtils.clamp(player.position.z + z * 1.2, -villageBounds.z, villageBounds.z)
-    }
-    const keydown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null
-      if (target && ['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT'].includes(target.tagName)) return
-      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) {
-        event.preventDefault()
-        keys.add(event.code)
-        setFocused(true)
-      }
-      if (event.code === 'KeyE') {
-        const nearest = stations.find((station, index) => index <= activeIndex && Math.hypot(player.position.x - station.position[0], player.position.z - station.position[1]) < 2.7)
-        if (nearest) {
-          setVisited((current) => current.includes(nearest.command) ? current : [...current, nearest.command])
+    if (interior) {
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(16, .3, 10), new THREE.MeshStandardMaterial({ color: 0x6c806d }))
+      floor.position.y = -.15
+      const back = new THREE.Mesh(new THREE.BoxGeometry(16, 6, .3), new THREE.MeshStandardMaterial({ color: interior.color }))
+      back.position.set(0, 3, -5)
+      scene.add(floor, back)
+      if (interior.id === 'commit') {
+        const line = new THREE.Mesh(new THREE.BoxGeometry(9, .13, .2), new THREE.MeshStandardMaterial({ color: 0xffe28a }))
+        line.position.set(0, 1.6, -3)
+        scene.add(line)
+        for (let i = 0; i < 6; i++) {
+          const book = addBook(scene, new THREE.Vector3(-4 + i * 1.6, 1.9, -3), i === 5 ? 0xffe28a : 0x56b9e8)
+          book.rotation.z = i % 2 ? .2 : -.2
         }
+        scene.add(label('ARCHIVIST TIMELINE  ·  snapshot books = commits', '#ffe28a').translateX(0))
+        scene.children.at(-1)!.position.set(0, 3.5, -3)
+        const archivist = new THREE.Mesh(new THREE.CapsuleGeometry(.28, .75, 4, 8), new THREE.MeshStandardMaterial({ color: 0xf1c27d }))
+        archivist.position.set(-3, 1, -1.5)
+        scene.add(archivist)
+        const movingBook = addBook(scene, new THREE.Vector3(-2.5, 1.8, -1.5), 0xa7f3d0)
+        animated.push({ object: movingBook, start: new THREE.Vector3(-2.5, 1.8, -1.5), end: new THREE.Vector3(3, 1.9, -3), speed: .3 })
+      } else if (interior.id === 'merge') {
+        const branchA = new THREE.Mesh(new THREE.BoxGeometry(4, .15, .3), new THREE.MeshStandardMaterial({ color: 0x38bdf8 }))
+        const branchB = new THREE.Mesh(new THREE.BoxGeometry(4, .15, .3), new THREE.MeshStandardMaterial({ color: 0xec4899 }))
+        branchA.position.set(-2, 1, -1.4); branchB.position.set(-2, 1, 1.4)
+        branchA.rotation.y = .2; branchB.rotation.y = -.2
+        const gate = new THREE.Mesh(new THREE.BoxGeometry(3, .18, .35), new THREE.MeshStandardMaterial({ color: 0xa7f3d0, emissive: 0x2c805d, emissiveIntensity: .5 }))
+        gate.position.set(2, 1, 0)
+        scene.add(branchA, branchB, gate)
+        const mergeSign = label('PULL REQUEST  →  REVIEW  →  MERGE', '#a7f3d0')
+        mergeSign.position.set(0, 3.5, -3)
+        scene.add(mergeSign)
+        const reviewBoard = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.5, .12), new THREE.MeshStandardMaterial({ color: 0x895ba5 }))
+        reviewBoard.position.set(0, 2.2, -3)
+        scene.add(reviewBoard)
+      } else {
+        const bench = new THREE.Mesh(new THREE.BoxGeometry(4, .35, 1.2), new THREE.MeshStandardMaterial({ color: 0x29385e }))
+        bench.position.set(0, 1, -2.4)
+        scene.add(bench)
+        const roomSign = label(`${interior.title}  ·  ${interior.command}`, '#ffe28a')
+        roomSign.position.set(0, 3.5, -3)
+        scene.add(roomSign)
       }
+    } else {
+      const ground = new THREE.Mesh(new THREE.BoxGeometry(38, .5, 26), new THREE.MeshStandardMaterial({ color: 0x72ae62, flatShading: true }))
+      ground.position.y = -.25
+      ground.receiveShadow = true
+      scene.add(ground)
+      const river = new THREE.Mesh(new THREE.BoxGeometry(3, .06, 26), new THREE.MeshStandardMaterial({ color: 0x4ea9d5, metalness: .2, roughness: .2 }))
+      river.position.set(-.5, .04, 0)
+      scene.add(river)
+      const square = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, .08, 8), new THREE.MeshStandardMaterial({ color: 0xd7b77d }))
+      square.position.y = .03
+      scene.add(square)
+      const pathMaterial = new THREE.MeshStandardMaterial({ color: 0xc79e67 })
+      const mainPath = new THREE.Mesh(new THREE.BoxGeometry(32, .05, 2), pathMaterial)
+      mainPath.position.y = .06
+      const crossPath = new THREE.Mesh(new THREE.BoxGeometry(2, .06, 23), pathMaterial)
+      crossPath.position.y = .065
+      scene.add(mainPath, crossPath)
+      const keep = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2, 6, 8), new THREE.MeshStandardMaterial({ color: 0x526e9c, flatShading: true }))
+      keep.position.set(-.5, 3, -1)
+      const cloud = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3, 1), new THREE.MeshStandardMaterial({ color: 0xf2f7ff, emissive: 0x334c88, emissiveIntensity: .2 }))
+      cloud.position.set(-.5, 7, -1)
+      scene.add(keep, cloud, label('REMOTE GITHUB  ·  push / pull').translateX(-.5))
+      scene.children.at(-1)!.position.set(-.5, 8.8, -1)
+      buildings.forEach((building) => { makeHouse(building, scene); obstacles.push(new THREE.Box3().setFromCenterAndSize(building.position.clone().setY(1.5), building.size.clone().addScalar(1))) })
+      ;[[-17, -11], [-17, 11], [17, -11], [17, 11], [14, 0], [-14, 0], [8, -11], [-9, 11], [14, 8], [-14, -8]].forEach(([x, z]) => addTree(scene, x, z))
+      const timelineBooks = [new THREE.Vector3(-11, 2, -7), new THREE.Vector3(-4, 2, -9)].map((position, index) => addBook(scene, position, index ? 0xffe28a : 0x56b9e8))
+      timelineBooks.forEach((book) => animated.push({ object: book, start: book.position.clone(), end: new THREE.Vector3(4, 1.2, 0), speed: .18 }))
+    }
+
+    let yaw = 0
+    let pitch = 0
+    let locked = false
+    const keys = new Set<string>()
+    const move = (event: Event) => {
+      const directions: Record<string, [number, number]> = { forward: [0, -1], backward: [0, 1], left: [-1, 0], right: [1, 0] }
+      const [x, z] = directions[(event as CustomEvent<string>).detail] ?? [0, 0]
+      player.position.x += x * .9
+      player.position.z += z * .9
+    }
+    const pointerlock = () => { locked = document.pointerLockElement === renderer.domElement; setPrompt(locked ? 'WASD move · mouse look · E enter · Escape release' : 'Click the world to capture the mouse') }
+    const click = () => renderer.domElement.requestPointerLock()
+    const mouse = (event: MouseEvent) => { if (locked) { yaw -= event.movementX * .0022; pitch = THREE.MathUtils.clamp(pitch - event.movementY * .0022, -1.2, 1.2) } }
+    const keydown = (event: KeyboardEvent) => {
+      if ((event.target as HTMLElement | null)?.tagName === 'BUTTON') return
+      if (event.code === 'KeyE') {
+        const near = !interior && buildings.find((building) => player.position.distanceTo(building.position) < 3.8)
+        if (near) { setVisited((current) => current.includes(near.id) ? current : [...current, near.id]); setObjective(`Explore ${near.title}`); setInterior(near) }
+        else if (interior) setInterior(null)
+      }
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) { event.preventDefault(); keys.add(event.code) }
     }
     const keyup = (event: KeyboardEvent) => keys.delete(event.code)
-    const pointerDown = (event: PointerEvent) => { dragging = true; lastPointerX = event.clientX }
-    const pointerMove = (event: PointerEvent) => { if (dragging) { yaw -= (event.clientX - lastPointerX) * 0.008; lastPointerX = event.clientX } }
-    const pointerUp = () => { dragging = false }
-    const wheel = (event: WheelEvent) => { cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.01, 6, 13) }
-    const accessibleMove = (event: Event) => movePlayer((event as CustomEvent<string>).detail)
-    window.addEventListener('keydown', keydown)
-    window.addEventListener('keyup', keyup)
-    window.addEventListener('gitquest-move', accessibleMove)
-    renderer.domElement.addEventListener('pointerdown', pointerDown)
-    renderer.domElement.addEventListener('pointermove', pointerMove)
-    renderer.domElement.addEventListener('pointerup', pointerUp)
-    renderer.domElement.addEventListener('pointerleave', pointerUp)
-    renderer.domElement.addEventListener('wheel', wheel)
-    const resize = () => {
-      const { width, height } = container.getBoundingClientRect()
-      camera.aspect = width / height
-      camera.updateProjectionMatrix()
-      renderer.setSize(width, height)
-    }
-    const observer = new ResizeObserver(resize)
-    observer.observe(container)
-    resize()
-    let animation = 0
-    let lastTime = performance.now()
+    renderer.domElement.addEventListener('click', click)
+    renderer.domElement.addEventListener('mousemove', mouse)
+    document.addEventListener('pointerlockchange', pointerlock)
+    window.addEventListener('keydown', keydown); window.addEventListener('keyup', keyup); window.addEventListener('gitquest-move', move)
+    const resize = () => { const { width, height } = container.getBoundingClientRect(); camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height) }
+    const observer = new ResizeObserver(resize); observer.observe(container); resize()
+    let frame = 0
+    let last = performance.now()
     const animate = (time: number) => {
-      animation = requestAnimationFrame(animate)
-      const delta = Math.min((time - lastTime) / 1000, 0.05)
-      lastTime = time
+      frame = requestAnimationFrame(animate)
+      const delta = Math.min((time - last) / 1000, .05); last = time
       const forward = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'))
       const side = Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'))
       const direction = new THREE.Vector3(side, 0, -forward).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw)
-      player.position.addScaledVector(direction, delta * 5)
-      player.position.x = THREE.MathUtils.clamp(player.position.x, -villageBounds.x, villageBounds.x)
-      player.position.z = THREE.MathUtils.clamp(player.position.z, -villageBounds.z, villageBounds.z)
-      if (direction.lengthSq() > 0) player.rotation.y = Math.atan2(direction.x, direction.z)
-      const target = player.position.clone().add(new THREE.Vector3(0, 0.7, 0))
-      const cameraOffset = new THREE.Vector3(Math.sin(yaw) * cameraDistance, 5.5, Math.cos(yaw) * cameraDistance)
-      camera.position.lerp(target.clone().add(cameraOffset), 1 - Math.pow(0.001, delta))
-      camera.lookAt(target)
-      marker.rotation.y += delta * 2
-      const nearest = stations.find(({ position }) => Math.hypot(player.position.x - position[0], player.position.z - position[1]) < 2.7)
-      setNearbyCommand((current) => current === (nearest?.command ?? null) ? current : nearest?.command ?? null)
+      const next = player.position.clone().addScaledVector(direction, delta * 5)
+      if (interior) { next.x = THREE.MathUtils.clamp(next.x, -7, 7); next.z = THREE.MathUtils.clamp(next.z, -4, 4) }
+      else { next.x = THREE.MathUtils.clamp(next.x, -17, 17); next.z = THREE.MathUtils.clamp(next.z, -11, 11); if (!obstacles.some((box) => box.containsPoint(next))) player.position.copy(next) }
+      player.position.y = eyeHeight
+      camera.position.copy(player.position); camera.rotation.order = 'YXZ'; camera.rotation.y = yaw; camera.rotation.x = pitch
+      animated.forEach((item, index) => { const phase = (time * item.speed / 1000 + index * .17) % 1; item.object.position.lerpVectors(item.start, item.end, phase < .5 ? phase * 2 : (1 - phase) * 2) })
       renderer.render(scene, camera)
     }
     animate(performance.now())
-    return () => {
-      cancelAnimationFrame(animation)
-      observer.disconnect()
-      window.removeEventListener('keydown', keydown)
-      window.removeEventListener('keyup', keyup)
-      window.removeEventListener('gitquest-move', accessibleMove)
-      renderer.domElement.removeEventListener('pointerdown', pointerDown)
-      renderer.domElement.removeEventListener('pointermove', pointerMove)
-      renderer.domElement.removeEventListener('pointerup', pointerUp)
-      renderer.domElement.removeEventListener('pointerleave', pointerUp)
-      renderer.domElement.removeEventListener('wheel', wheel)
-      renderer.dispose()
-      container.removeChild(renderer.domElement)
-    }
-  }, [activeIndex, ready, visited, interiorStation])
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); renderer.domElement.removeEventListener('click', click); renderer.domElement.removeEventListener('mousemove', mouse); document.removeEventListener('pointerlockchange', pointerlock); window.removeEventListener('keydown', keydown); window.removeEventListener('keyup', keyup); window.removeEventListener('gitquest-move', move); renderer.dispose(); container.removeChild(renderer.domElement) }
+  }, [ready, interior])
 
-  const interact = () => {
-    const station = stations.find((item) => item.command === nearbyCommand)
-    if (!station || stations.findIndex((item) => item.command === station.command) > activeIndex) return
-    setVisited((current) => current.includes(station.command) ? current : [...current, station.command])
-    setInteriorStation(station)
-  }
-  const moveWithButton = (direction: string) => {
-    window.dispatchEvent(new CustomEvent('gitquest-move', { detail: direction }))
-    setFocused(true)
-  }
-
-  if (!ready) {
-    return (
-      <main className="loading-screen">
-        <div className="loading-mark">GH</div>
-        <p className="eyebrow">GitQuest · GitHub Village</p>
-        <h1>Preparing the village</h1>
-        <p>Placing houses, paths, lanterns, and learning objectives…</p>
-        <div className="loading-track" role="progressbar" aria-valuenow={loadingProgress} aria-valuemin={0} aria-valuemax={100}>
-          <span style={{ width: `${loadingProgress}%` }} />
-        </div>
-        <strong>{loadingProgress}% ready</strong>
-      </main>
-    )
-  }
-
-  return (
-    <main className="app-shell">
-      <section className="world-card">
-        <header className="hud">
-          <div className="objective" aria-live="polite"><span>{interiorStation ? 'INSIDE' : 'NEXT HOUSE'}</span><strong>{interiorStation ? interiorStation.title : activeIndex < 0 ? 'Village complete' : objectiveStation.title}</strong><small>{interiorStation ? `${interiorStation.command} · E / Esc to exit` : activeIndex < 0 ? 'All houses explored' : objectiveStation.command}</small></div>
-        </header>
-        <div ref={sceneRef} className="scene" role="img" aria-label={interiorStation ? `${interiorStation.title} interior with a procedural GitHub lesson display.` : 'GitHub Village with a central monument, winding paths, and themed learning houses.'} tabIndex={0} onFocus={() => setFocused(true)} />
-        <div className="scene-controls">
-          <p>{interiorStation ? `Inside ${interiorStation.title}: explore the lesson props. Press E or Escape to leave.` : focused ? 'Active houses glow gold. Walk to one and press E.' : 'Click the village to focus keyboard movement.'}</p>
-          <div className="d-pad" aria-label="Accessible movement controls">
-            <button type="button" onClick={() => moveWithButton('forward')} aria-label="Move forward">▲</button>
-            <button type="button" onClick={() => moveWithButton('left')} aria-label="Move left">◀</button>
-            <button type="button" onClick={() => moveWithButton('backward')} aria-label="Move backward">▼</button>
-            <button type="button" onClick={() => moveWithButton('right')} aria-label="Move right">▶</button>
-          </div>
-          {interiorStation ? <button type="button" className="interact-button exit-button" onClick={() => setInteriorStation(null)}>Exit to village</button> : <button type="button" className="interact-button" onClick={interact} disabled={!nearbyCommand}>{nearbyCommand ? `Enter: ${nearbyCommand}` : 'Walk near an active house'}</button>}
-        </div>
-      </section>
-    </main>
-  )
+  if (!ready) return <main className="loading-screen"><div className="loading-mark">GH</div><p className="eyebrow">Github Village</p><h1>Preparing the world</h1><div className="loading-track" role="progressbar" aria-valuenow={loading} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${loading}%` }} /></div><strong>{loading}%</strong></main>
+  const moveButton = (direction: string) => window.dispatchEvent(new CustomEvent('gitquest-move', { detail: direction }))
+  return <main className="app-shell"><section className="world-card"><div ref={sceneRef} className="scene" role="img" aria-label={interior ? `${interior.title} interior` : 'First-person procedural Github Village'} tabIndex={0} /><div className="minimal-hud"><strong>{interior ? interior.title : objective}</strong><small>{interior ? `${interior.command} · ${interior.lesson}` : `${prompt} · ${visited.length}/${buildings.length} buildings explored`}</small></div><div className="scene-controls"><div className="d-pad" aria-label="Accessible movement controls"><button type="button" onClick={() => moveButton('forward')}>▲</button><button type="button" onClick={() => moveButton('left')}>◀</button><button type="button" onClick={() => moveButton('backward')}>▼</button><button type="button" onClick={() => moveButton('right')}>▶</button></div>{interior && <button type="button" className="interact-button exit-button" onClick={() => setInterior(null)}>Exit (E)</button>}</div></section></main>
 }
 
 export default App
